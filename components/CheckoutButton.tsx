@@ -1,45 +1,46 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { createClientBrowser } from '@/utils/supabase';
+import { useState, useEffect } from "react";
+import { createClient } from "@/utils/supabase/client"; //
 
 export default function CheckoutButton() {
-  const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const supabase = createClientBrowser();
+  const [loading, setLoading] = useState(true);
+  
+  // Initialize the Supabase Browser Client
+  const supabase = createClient(); //
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) setUserId(user.id);
-    };
+    async function getUser() {
+      const { data: { user } } = await supabase.auth.getUser(); //
+      if (user) {
+        setUserId(user.id);
+      }
+      setLoading(false);
+    }
     getUser();
-  }, [supabase.auth]);
+  }, [supabase]);
 
   const handleCheckout = () => {
-    if (!userId) {
-      alert("Please log in to purchase the premium pass.");
-      return;
-    }
-
-    setLoading(true);
+    // Replace YOUR_PRODUCT_ID with your actual Lemon Squeezy product URL
     const PRODUCT_URL = "https://your-store.lemonsqueezy.com/checkout/buy/YOUR_PRODUCT_ID";
-    const checkoutUrl = new URL(PRODUCT_URL);
-    checkoutUrl.searchParams.append('checkout[custom][user_id]', userId);
-    window.location.href = checkoutUrl.toString();
+    
+    // Attach the Supabase user ID to the checkout URL so the webhook knows who paid
+    if (userId) {
+      window.location.href = `${PRODUCT_URL}?checkout[custom][user_id]=${userId}`;
+    } else {
+      alert("Please log in first to purchase a premium pass.");
+    }
   };
 
+  if (loading) return <button className="bg-gray-300 px-4 py-2 rounded-md animate-pulse">Loading...</button>;
+
   return (
-    <div className="p-6 bg-white border border-blue-200 rounded-xl shadow-sm text-center mt-6">
-      <h3 className="text-lg font-bold text-slate-900 mb-2">Premium Exam Pass</h3>
-      <p className="text-slate-500 mb-4 text-xs">Unlock unlimited generations and bypass free-tier rate limits.</p>
-      <button 
-        onClick={handleCheckout}
-        disabled={loading || !userId}
-        className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-      >
-        {loading ? 'Redirecting...' : 'Upgrade Now - $9.99'}
-      </button>
-    </div>
+    <button 
+      onClick={handleCheckout}
+      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-all shadow-md"
+    >
+      Upgrade to Premium
+    </button>
   );
 }
