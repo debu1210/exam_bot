@@ -1,57 +1,60 @@
-import { NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
-import { createClient } from '@supabase/supabase-js';
-import { createClientServer } from '@/utils/supabase';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server'; //
+import Groq from 'groq-sdk'; //
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Initialize Groq securely on the server
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY }); //
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabaseSession = await createClientServer();
-    const { data: { user } } = await supabaseSession.auth.getUser();
+    // 1. Verify the user using the new Server Client
+    const supabase = await createClient(); //
+    const { data: { user }, error: authError } = await supabase.auth.getUser(); //
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 });
     }
 
-    const { subject, outputType } = await req.json();
+    // 2. Parse the request from the frontend
+    const body = await request.json();
+    const { subject, topic, type } = body;
 
-    const prompt = `
-      You are an expert academic tutor. The user needs a ${outputType} for the subject: ${subject}. 
-      Ensure the output is highly accurate, formatted beautifully in Markdown, and directly addresses standard syllabus requirements. 
-      Do not include conversational filler; go straight to the educational material.
-    `;
-
-    let generatedContent = '';
-    try {
-      const response = await groq.chat.completions.create({
-        messages: [{ role: 'user', content: prompt }],
-        model: 'llama-3.3-70b-versatile',
-      });
-      generatedContent = response.choices[0]?.message?.content || '';
-    } catch (aiError: any) {
-      console.error('Groq API Error:', aiError);
-      if (aiError.status === 429) {
-        return NextResponse.json({ error: 'Free tier limit reached. Please wait or upgrade.' }, { status: 429 });
-      }
-      throw aiError;
+    if (!subject || !topic || !type) {
+      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
+    // 3. Check if the user is premium (Optional check from your database)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_premium')
+      .eq('id', user.id)
+      .single();
+
+    // 4. Generate the AI Study Material via Groq
+    const prompt = `Create a highly accurate ${type} for the subject ${subject} focusing on ${topic}. Tailor it for an advanced high school (ISC/JEE) level.`;
+    
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }], //
+      model: "llama3-8b-8192", 
+    });
+
+    const aiResponse = completion.choices[0]?.message?.content || "Generation failed.";
+
+    // 5. Save the generated material to the database
+    const { error: dbError } = await supabase
       .from('study_materials')
-      .insert([{ user_id: user.id, subject, output_type, content: generatedContent }])
-      .select();
+      .insert([
+        { user_id: user.id, subject, topic, content: aiResponse }
+      ]);
 
-    if (error) throw error;
+    if (dbError) {
+      console.error("Database save error:", dbError);
+    }
 
-    return NextResponse.json({ result: generatedContent, record: data[0] });
+    return NextResponse.json({ success: true, data: aiResponse });
 
   } catch (error) {
-    console.error('Generation Error:', error);
-    return NextResponse.json({ error: 'Failed to generate material.' }, { status: 500 });
+    console.error("Generation Error:", error);
+    return NextResponse.json({ error: "Failed to generate material." }, { status: 500 });
   }
 }
