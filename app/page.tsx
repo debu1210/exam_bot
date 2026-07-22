@@ -20,7 +20,7 @@ export default function ExamBotMVP() {
   const [history, setHistory] = useState<StudyMaterial[]>([]);
   const [isPremium, setIsPremium] = useState(false);
   
-  const supabase = createClientBrowser();
+  const supabase = createClient();
 
   const fetchUserData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
