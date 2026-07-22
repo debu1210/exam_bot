@@ -1,6 +1,6 @@
 'use client';
 
-import { createClientBrowser } from '@/utils/supabase';
+import { createClient } from '@/utils/supabase/server';
 import { useState } from 'react';
 
 export default function Login() {
