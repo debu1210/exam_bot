@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClientBrowser } from '@/utils/supabase';
+import { createClient } from '@/utils/supabase/server';
 import CheckoutButton from '@/components/CheckoutButton';
 
 type StudyMaterial = {
