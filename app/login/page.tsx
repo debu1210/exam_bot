@@ -1,6 +1,6 @@
 'use client';
 
-import { createClient } from '@/utils/supabase/server';
+import { createClient } from '@/utils/supabase/client';
 import { useState } from 'react';
 
 export default function Login() {
@@ -8,7 +8,7 @@ export default function Login() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    const supabase = createClientBrowser();
+    const supabase = createClient();
     
     await supabase.auth.signInWithOAuth({
       provider: 'google',
